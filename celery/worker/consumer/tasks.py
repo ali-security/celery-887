@@ -30,6 +30,10 @@ class Tasks(bootsteps.StartStopStep):
         # and if so make sure the 'apply_global' flag is set on qos updates.
         qos_global = not c.connection.qos_semantics_matches_spec
 
+        # Override global qos setting if worker_quorumq is enabled for POC testing
+        if c.app.conf.worker_quorumq is True:
+            qos_global = False
+
         # set initial prefetch count
         c.connection.default_channel.basic_qos(
             0, c.initial_prefetch_count, qos_global,

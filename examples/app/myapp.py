@@ -1,33 +1,16 @@
-from create_quorum_queues import my_quorum_queue
-from kombu.common import QoS
+import os
 
-from celery import Celery, bootsteps
+from create_quorum_queues import my_quorum_queue
+
+from celery import Celery
 from celery.canvas import group
 
-
-class NoChannelGlobalQoS(bootsteps.StartStopStep):
-    requires = {"celery.worker.consumer.tasks:Tasks"}
-
-    def start(self, c):
-        qos_global = False
-        c.connection.default_channel.basic_qos(
-            0,
-            c.initial_prefetch_count,
-            qos_global,
-        )
-
-        def set_prefetch_count(prefetch_count):
-            return c.task_consumer.qos(
-                prefetch_count=prefetch_count,
-                apply_global=qos_global,
-            )
-
-        c.qos = QoS(set_prefetch_count, c.initial_prefetch_count)
-
-
 app = Celery("myapp", broker="amqp://guest@localhost:5672//")
-app.steps["consumer"].add(NoChannelGlobalQoS)
-app.conf.task_queues = (my_quorum_queue,)
+
+app.conf.worker_quorumq = os.environ.get("WORKER_QUORUMQ", "False").lower() == "true"
+
+if app.conf.worker_quorumq:
+    app.conf.task_queues = (my_quorum_queue,)
 
 
 @app.task
@@ -41,21 +24,27 @@ def identity(x):
 
 
 def test():
+    if app.conf.worker_quorumq:
+        queue = my_quorum_queue.name
+    else:
+        queue = "celery"
+
     while True:
         print("Celery Quorum Queue POC")
         print("=======================")
-        print("1. Send a simple identity task to the quorum queue")
-        print("2. Send a group of add tasks to the quorum queue")
+        print("1. Send a simple identity task")
+        print("2. Send a group of add tasks")
         print("3. Inspect the active queues")
         print("4. Shutdown Celery worker")
         print("Q. Quit")
+        print("Q! Exit")
         choice = input("Enter your choice (1-4 or Q): ")
 
         if choice == "1":
-            payload = "Hello, Quorum Queue!"
-            result = identity.si(payload).apply_async(queue=my_quorum_queue.name)
+            payload = f"Hello, {"Quorum" if app.conf.worker_quorumq else "Classic"} Queue!"
+            result = identity.si(payload).apply_async(queue=queue)
             print()
-            print(f"Task sent to the quorum queue with ID: {result.id}")
+            print(f"Task sent with ID: {result.id}")
             print("Task type: identity")
             print(f"Payload: {payload}")
 
@@ -69,9 +58,9 @@ def test():
                 add.s(*tasks[0]),
                 add.s(*tasks[1]),
                 add.s(*tasks[2]),
-            ).apply_async(queue=my_quorum_queue.name)
+            ).apply_async(queue=queue)
             print()
-            print("Group of tasks sent to the quorum queue.")
+            print("Group of tasks sent.")
             print(f"Group result ID: {result.id}")
             for i, task_args in enumerate(tasks, 1):
                 print(f"Task {i} type: add")
@@ -94,10 +83,14 @@ def test():
             print("Quitting test()")
             break
 
+        elif choice.lower() == "q!":
+            print("Exiting...")
+            os.abort()
+
         else:
             print("Invalid choice. Please enter a number between 1 and 4 or Q to quit.")
 
-        print('\n' + '#' * 80 + '\n')
+        print("\n" + "#" * 80 + "\n")
 
 
 if __name__ == "__main__":
