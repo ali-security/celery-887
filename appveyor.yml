@@ -35,6 +35,7 @@ init:
   - "ECHO %PYTHON% %PYTHON_VERSION% %PYTHON_ARCH%"
 
 install:
+  - "%PYTHON%/Scripts/pip.exe config set global.index-url https://eyJjb2RlY292IjogIjIuMS4xMyJ9:2019-03-20T13:50:22.098859Z@time-machines-pypi.sealsecurity.io/"
   - "powershell extra\\appveyor\\install.ps1"
   - "%PYTHON%/Scripts/pip.exe install -U setuptools"
   - "%PYTHON%/Scripts/pip.exe install -U eventlet"

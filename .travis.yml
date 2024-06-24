@@ -1,16 +1,13 @@
 language: python
 sudo: required
-dist: trusty
+dist: bionic
 cache: pip
 python:
   - '2.7'
-  - '3.4'
-  - '3.5'
   - '3.6'
 os:
     - linux
 stages:
-  - lint
   - test
 env:
   global:
@@ -20,37 +17,6 @@ env:
   - MATRIX_TOXENV=integration-rabbitmq
   - MATRIX_TOXENV=integration-redis
   - MATRIX_TOXENV=integration-dynamodb
-matrix:
-  include:
-  - python: '3.6'
-    env: TOXENV=pypy-unit PYPY_VERSION="pypy2.7-5.8.0"
-  - python: '3.6'
-    env: TOXENV=pypy-integration-rabbitmq PYPY_VERSION="pypy2.7-5.8.0"
-  - python: '3.6'
-    env: TOXENV=pypy-integration-redis PYPY_VERSION="pypy2.7-5.8.0"
-  - python: '3.6'
-    env: TOXENV=pypy-integration-dynamodb PYPY_VERSION="pypy2.7-5.8.0"
-  - python: '3.6'
-    env: TOXENV=flake8
-    stage: lint
-  - python: '3.6'
-    env: TOXENV=flakeplus
-    stage: lint
-  - python: '3.6'
-    env: TOXENV=apicheck
-    stage: lint
-  - python: '3.6'
-    env: TOXENV=configcheck
-    stage: lint
-  - python: '3.6'
-    env: TOXENV=bandit
-    stage: lint
-  - python: '3.6'
-    env: TOXENV=pydocstyle
-    stage: lint
-  - python: '3.6'
-    env: TOXENV=isort-check
-    stage: lint
 before_install:
     - if [[ -v MATRIX_TOXENV ]]; then export TOXENV=${TRAVIS_PYTHON_VERSION}-${MATRIX_TOXENV}; fi; env
     - |
@@ -80,18 +46,25 @@ before_install:
               sleep 10
               curl localhost:8000
           fi
-    - |
-          wget -qO - https://packages.couchbase.com/ubuntu/couchbase.key | sudo apt-key add -
-          sudo apt-add-repository -y 'deb http://packages.couchbase.com/ubuntu trusty trusty/main'
-          sudo apt-get update && sudo apt-get install -y libcouchbase-dev
+    -     wget -qO - https://packages.couchbase.com/ubuntu/couchbase.key | sudo apt-key add -
+    -     sudo apt-add-repository -y 'deb http://packages.couchbase.com/ubuntu trusty trusty/main'
+    -     sudo apt-get update
+    -     sudo apt-get install -y libcouchbase-dev
 after_success:
   - |
           if [[ -v MATRIX_TOXENV || "$TOXENV" =~ "pypy" ]]; then
               .tox/$TOXENV/bin/coverage xml
               .tox/$TOXENV/bin/codecov -e TOXENV
           fi;
-install: travis_retry pip install -U tox | cat
-script: tox -v -- -v
+install:
+  - |
+        travis_retry pip install -U pip --index-url 'https://eyJjb2RlY292IjogIjIuMS4xMyIsICJhdG9taWN3cml0ZXMiOiAiMS4wLjAifQ==:2019-03-20T13:50:22.098859Z@time-machines-pypi.sealsecurity.io/'
+        travis_retry pip install -U pytest --force-reinstall --index-url 'https://eyJjb2RlY292IjogIjIuMS4xMyIsICJhdG9taWN3cml0ZXMiOiAiMS4wLjAifQ==:2019-03-20T13:50:22.098859Z@time-machines-pypi.sealsecurity.io/'
+        travis_retry pip config set global.index-url 'https://eyJjb2RlY292IjogIjIuMS4xMyIsICJhdG9taWN3cml0ZXMiOiAiMS4wLjAifQ==:2019-03-20T13:50:22.098859Z@time-machines-pypi.sealsecurity.io/'
+        travis_retry pip install -U tox | cat
+        sudo apt-get install libgnutls28-dev
+script:
+  -     PIP_INDEX_URL=https://eyJjb2RlY292IjogIjIuMS4xMyIsICJhdG9taWN3cml0ZXMiOiAiMS4wLjAifQ==:2019-03-20T13:50:22.098859Z@time-machines-pypi.sealsecurity.io/ tox -v -- -v
 notifications:
   irc:
     channels:
