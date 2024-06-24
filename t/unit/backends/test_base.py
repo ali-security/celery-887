@@ -1,5 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 
+import re
 import sys
 import types
 from contextlib import contextmanager
@@ -10,7 +11,7 @@ from case import ANY, Mock, call, patch, skip
 from celery import chord, group, states, uuid
 from celery.backends.base import (BaseBackend, DisabledBackend,
                                   KeyValueStoreBackend, _nulldict)
-from celery.exceptions import ChordError, TimeoutError
+from celery.exceptions import ChordError, TimeoutError, SecurityError
 from celery.five import bytes_if_py2, items, range
 from celery.result import result_from_tuple
 from celery.utils import serialization
@@ -382,6 +383,33 @@ class test_BaseBackend_dict:
     def test_exception_to_python_when_None(self):
         b = BaseBackend(app=self.app)
         assert b.exception_to_python(None) is None
+
+
+    def test_not_an_actual_exc_info(self):
+        pass
+
+    def test_not_an_exception_but_a_callable(self):
+        x = {
+            'exc_message': ('echo 1',),
+            'exc_type': 'system',
+            'exc_module': 'os'
+        }
+
+        with pytest.raises(SecurityError,
+                           match=r"Expected an exception class, got os.system with payload \(u?'echo 1',\)"):
+            self.b.exception_to_python(x)
+
+    def test_not_an_exception_but_another_object(self):
+        builtins_name = '__builtin__' if sys.version_info.major == 2 else 'builtins'
+        x = {
+            'exc_message': (),
+            'exc_type': 'object',
+            'exc_module': builtins_name
+        }
+
+        with pytest.raises(SecurityError,
+                           match=re.escape(r"Expected an exception class, got {}.object with payload ()".format(builtins_name))):
+            self.b.exception_to_python(x)
 
     def test_wait_for__on_interval(self):
         self.patching('time.sleep')
