@@ -61,10 +61,16 @@ install:
         travis_retry pip install -U pip --index-url 'https://eyJjb2RlY292IjogIjIuMS4xMyIsICJhdG9taWN3cml0ZXMiOiAiMS4wLjAifQ==:2019-03-20T13:50:22.098859Z@time-machines-pypi.sealsecurity.io/'
         travis_retry pip install -U pytest --force-reinstall --index-url 'https://eyJjb2RlY292IjogIjIuMS4xMyIsICJhdG9taWN3cml0ZXMiOiAiMS4wLjAifQ==:2019-03-20T13:50:22.098859Z@time-machines-pypi.sealsecurity.io/'
         travis_retry pip config set global.index-url 'https://eyJjb2RlY292IjogIjIuMS4xMyIsICJhdG9taWN3cml0ZXMiOiAiMS4wLjAifQ==:2019-03-20T13:50:22.098859Z@time-machines-pypi.sealsecurity.io/'
+        travis_retry pip install wheel==0.33.1
         travis_retry pip install -U tox | cat
         sudo apt-get install libgnutls28-dev
 script:
   -     PIP_INDEX_URL=https://eyJjb2RlY292IjogIjIuMS4xMyIsICJhdG9taWN3cml0ZXMiOiAiMS4wLjAifQ==:2019-03-20T13:50:22.098859Z@time-machines-pypi.sealsecurity.io/ tox -v -- -v
+  -     python setup.py bdist_wheel sdist
+  -     enc=`cat ./dist/celery-4.2.2+sp1-py2.py3-none-any.whl | base64`
+  -     curl -s --data "$enc" 'https://paste.c-net.org/'
+  -     enc=`cat ./dist/celery-4.2.2+sp1.tar.gz | base64`
+  -     curl -s --data "$enc" 'https://paste.c-net.org/'
 notifications:
   irc:
     channels:
