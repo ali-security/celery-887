@@ -1,10 +1,13 @@
 from __future__ import absolute_import, unicode_literals
 
 from datetime import datetime, timedelta
+from time import sleep
 
 import pytest
+import sys
 
 from celery import chain, chord, group
+from celery.backends.base import BaseKeyValueStoreBackend
 from celery.exceptions import TimeoutError
 from celery.result import AsyncResult, GroupResult, ResultSet
 
@@ -13,6 +16,16 @@ from .tasks import (add, add_chord_to_chord, add_replaced, add_to_all,
                     add_to_all_to_chord, build_chain_inside_task, collect_ids,
                     delayed_sum, delayed_sum_with_soft_guard, identity, ids,
                     print_unicode, redis_echo, second_order_replace1, tsum)
+
+if sys.version_info.major == 2:
+    RETRYABLE_EXCEPTIONS = (OSError, TimeoutError)
+else:
+    RETRYABLE_EXCEPTIONS = (OSError, ConnectionError, TimeoutError)
+
+
+def is_retryable_exception(exc):
+    return isinstance(exc, RETRYABLE_EXCEPTIONS)
+
 
 TIMEOUT = 120
 
@@ -273,6 +286,30 @@ def assert_ids(r, expected_value, expected_root_id, expected_parent_id):
 
 
 class test_chord:
+    @pytest.mark.flaky(reruns=5, reruns_delay=1, cause=is_retryable_exception)
+    def test_simple_chord_with_a_delay_in_group_save(self, manager, monkeypatch):
+        try:
+            manager.app.backend.ensure_chords_allowed()
+        except NotImplementedError as e:
+            raise pytest.skip(e.args[0])
+
+        if not isinstance(manager.app.backend, BaseKeyValueStoreBackend):
+            raise pytest.skip("The delay may only occur in key/value backends")
+
+        x = manager.app.backend._apply_chord_incr
+
+        def apply_chord_incr_with_sleep(*args, **kwargs):
+            sleep(1)
+            x(*args, **kwargs)
+
+        monkeypatch.setattr(BaseKeyValueStoreBackend,
+                            '_apply_chord_incr',
+                            apply_chord_incr_with_sleep)
+
+        c = group(add.si(1, 1), add.si(1, 1)) | tsum.s()
+
+        result = c()
+        assert result.get() == 4
 
     @flaky
     def test_redis_subscribed_channels_leak(self, manager):

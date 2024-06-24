@@ -1273,8 +1273,7 @@ class chord(Signature):
         options.pop('chord', None)
         options.pop('task_id', None)
 
-        header.freeze(group_id=group_id, chord=body, root_id=root_id)
-        header_result = header(*partial_args, task_id=group_id, **options)
+        header_result = header.freeze(group_id=group_id, chord=body, root_id=root_id)
 
         if len(header_result) > 0:
             app.backend.apply_chord(
@@ -1284,6 +1283,7 @@ class chord(Signature):
                 countdown=countdown,
                 max_retries=max_retries,
             )
+            header_result = header(*partial_args, task_id=group_id, **options)
         # The execution of a chord body is normally triggered by its header's
         # tasks completing. If the header is empty this will never happen, so
         # we execute the body manually here.
